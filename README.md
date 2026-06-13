@@ -110,3 +110,4 @@ helm upgrade --install devops-app ./helm/devops-app \
 - [x] Fase 2: Docker + Docker Compose
 - [x] Fase 3: Kubernetes + Helm (3 entornos)
 - [x] Fase 4: GitHub Actions CI/CD
+# trigger
