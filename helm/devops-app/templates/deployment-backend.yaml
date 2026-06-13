@@ -42,7 +42,7 @@ spec:
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
           ports:
-            - containerPort: {{ .Values.service.port | default 3000 }}
+            - containerPort: {{ .Values.backend.service.port }}
               protocol: TCP
 
           # Variables de entorno desde ConfigMap (no sensibles)
