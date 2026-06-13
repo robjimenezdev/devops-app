@@ -1,0 +1,23 @@
+# ============================================================
+# Service — Base de datos PostgreSQL
+# Tipo ClusterIP: solo el backend puede hablar con ella
+# Nunca expuesta al exterior
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "devops-app.fullname" . }}-db
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "devops-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  type: {{ .Values.database.service.type }}   # ClusterIP
+  ports:
+    - port: {{ .Values.database.service.port }}        # 5432
+      targetPort: {{ .Values.database.service.port }}  # 5432 del contenedor
+      protocol: TCP
+      name: postgres
+  selector:
+    {{- include "devops-app.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: database

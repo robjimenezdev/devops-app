@@ -1,0 +1,67 @@
+# ============================================================
+# HPA — Horizontal Pod Autoscaler
+# Escala automáticamente los Pods según uso de CPU
+# Solo activo si autoscaling.enabled: true en el values
+# En dev: false | En staging/prod: true
+# ============================================================
+
+# --- HPA Backend ---
+{{- if .Values.backend.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "devops-app.fullname" . }}-backend-hpa
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "devops-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  # A qué Deployment controla este HPA
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "devops-app.fullname" . }}-backend
+
+  minReplicas: {{ .Values.backend.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.backend.autoscaling.maxReplicas }}
+
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          # Si la CPU supera este % → escala hacia arriba
+          # Si baja mucho → escala hacia abajo
+          averageUtilizationPercentage: {{ .Values.backend.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}
+
+---
+
+# --- HPA Frontend ---
+{{- if .Values.frontend.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "devops-app.fullname" . }}-frontend-hpa
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "devops-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "devops-app.fullname" . }}-frontend
+
+  minReplicas: {{ .Values.frontend.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.frontend.autoscaling.maxReplicas }}
+
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilizationPercentage: {{ .Values.frontend.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}

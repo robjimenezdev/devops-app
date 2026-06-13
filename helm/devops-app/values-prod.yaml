@@ -1,0 +1,45 @@
+# ============================================================
+# values-prod.yaml — Sobreescribe values.yaml para PROD
+# Requiere aprobación manual en GitHub Actions
+# ============================================================
+
+global:
+  environment: prod
+
+backend:
+  replicaCount: 3           # alta disponibilidad
+  image:
+    tag: stable             # solo imágenes taggeadas como stable
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 60
+
+frontend:
+  replicaCount: 3
+  image:
+    tag: stable
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 60
+
+database:
+  persistence:
+    size: 10Gi
+    storageClass: fast      # storageClass de producción (SSD)
+
+ingress:
+  host: devops-app.com      # dominio real de producción
+  tls: true                 # HTTPS con cert-manager
+
+namespace: prod

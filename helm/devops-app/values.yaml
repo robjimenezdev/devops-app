@@ -1,0 +1,141 @@
+# ============================================================
+# values.yaml — Valores por defecto del chart
+# Cada entorno sobreescribe solo lo que necesita cambiar
+# ============================================================
+
+# ----------------------------------------------------------
+# GLOBAL — compartido por todos los servicios
+# ----------------------------------------------------------
+global:
+  environment: dev
+  imageRegistry: docker.io  # Docker Hub por defecto
+
+# ----------------------------------------------------------
+# BACKEND
+# ----------------------------------------------------------
+backend:
+  image:
+    repository: robjimenezdev/devops-app-backend
+    tag: latest
+    pullPolicy: IfNotPresent  # no descarga si ya existe en el nodo
+
+  replicaCount: 1
+
+  service:
+    type: ClusterIP   # solo accesible dentro del clúster
+    port: 3000
+
+  resources:
+    requests:         # mínimo garantizado
+      cpu: 100m       # 100 milicores = 0.1 CPU
+      memory: 128Mi
+    limits:           # máximo permitido
+      cpu: 250m
+      memory: 256Mi
+
+  # Autoescalado (HPA)
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+
+  # Pruebas de vida y salud del Pod
+  livenessProbe:
+    path: /health
+    initialDelaySeconds: 15
+    periodSeconds: 20
+
+  readinessProbe:
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 10
+
+# ----------------------------------------------------------
+# FRONTEND
+# ----------------------------------------------------------
+frontend:
+  image:
+    repository: robjimenezdev/devops-app-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  service:
+    type: ClusterIP
+    port: 80
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+
+# ----------------------------------------------------------
+# BASE DE DATOS — PostgreSQL
+# ----------------------------------------------------------
+database:
+  image:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1   # la DB siempre 1 réplica (sin clustering)
+
+  service:
+    type: ClusterIP
+    port: 5432
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  # Persistencia de datos
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: standard  # en minikube / cambiar en prod
+
+# ----------------------------------------------------------
+# CONFIGURACIÓN — variables no sensibles (ConfigMap)
+# ----------------------------------------------------------
+config:
+  dbName: contactsdb
+  dbPort: "5432"
+  backendPort: "3000"
+
+# ----------------------------------------------------------
+# SECRETOS — valores sensibles (Secret de Kubernetes)
+# Los valores reales se inyectan desde GitHub Secrets
+# en el pipeline. Aquí solo ponemos placeholders.
+# ----------------------------------------------------------
+secret:
+  dbUser: ""
+  dbPassword: ""
+
+# ----------------------------------------------------------
+# INGRESS — punto de entrada público
+# ----------------------------------------------------------
+ingress:
+  enabled: true
+  className: nginx
+  host: devops-app.local    # en prod será el dominio real
+  tls: false                # en prod será true con cert-manager
+
+# ----------------------------------------------------------
+# NAMESPACE — espacio de nombres en Kubernetes
+# ----------------------------------------------------------
+namespace: dev

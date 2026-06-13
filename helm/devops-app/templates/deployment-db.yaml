@@ -1,0 +1,118 @@
+# ============================================================
+# PersistentVolumeClaim — Almacenamiento para PostgreSQL
+# Sin esto los datos se pierden cuando el Pod se reinicia
+# ============================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "devops-app.fullname" . }}-db-pvc
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "devops-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  accessModes:
+    - ReadWriteOnce     # solo un Pod puede escribir a la vez (correcto para DB)
+  storageClassName: {{ .Values.database.persistence.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.database.persistence.size }}
+
+---
+# ============================================================
+# Deployment — PostgreSQL
+# IMPORTANTE: siempre 1 réplica — PostgreSQL no escala
+# horizontalmente sin soluciones específicas (Patroni, etc)
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "devops-app.fullname" . }}-db
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "devops-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  replicas: 1           # SIEMPRE 1 — nunca escalar PostgreSQL así
+  strategy:
+    type: Recreate      # para DB usamos Recreate, no RollingUpdate
+                        # RollingUpdate con volúmenes compartidos puede corromper datos
+
+  selector:
+    matchLabels:
+      {{- include "devops-app.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: database
+
+  template:
+    metadata:
+      labels:
+        {{- include "devops-app.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: database
+    spec:
+      containers:
+        - name: db
+          image: "{{ .Values.database.image.repository }}:{{ .Values.database.image.tag }}"
+          imagePullPolicy: {{ .Values.database.image.pullPolicy }}
+          ports:
+            - containerPort: 5432
+              protocol: TCP
+
+          # Credenciales desde ConfigMap y Secret
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "devops-app.configName" . }}
+                  key: DB_NAME
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "devops-app.secretName" . }}
+                  key: DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "devops-app.secretName" . }}
+                  key: DB_PASSWORD
+
+          resources:
+            requests:
+              cpu:    {{ .Values.database.resources.requests.cpu }}
+              memory: {{ .Values.database.resources.requests.memory }}
+            limits:
+              cpu:    {{ .Values.database.resources.limits.cpu }}
+              memory: {{ .Values.database.resources.limits.memory }}
+
+          # Liveness — comprueba que PostgreSQL acepta conexiones
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+                - -d
+                - $(POSTGRES_DB)
+            initialDelaySeconds: 30
+            periodSeconds: 20
+
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+                - -d
+                - $(POSTGRES_DB)
+            initialDelaySeconds: 15
+            periodSeconds: 10
+
+          # Montamos el volumen persistente en la carpeta de datos de PostgreSQL
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+
+      # Referenciamos el PVC creado arriba
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: {{ include "devops-app.fullname" . }}-db-pvc

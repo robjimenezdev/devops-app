@@ -1,0 +1,92 @@
+# ============================================================
+# Deployment — Backend Node.js
+# Gestiona los Pods del backend, réplicas y actualizaciones
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "devops-app.fullname" . }}-backend
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "devops-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+
+  # Estrategia de actualización — RollingUpdate
+  # Actualiza los Pods de uno en uno sin downtime
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # máximo 1 Pod extra durante la actualización
+      maxUnavailable: 0  # nunca dejar Pods sin servicio
+
+  selector:
+    matchLabels:
+      {{- include "devops-app.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+
+  template:
+    metadata:
+      labels:
+        {{- include "devops-app.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+    spec:
+      # No correr como root
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.port | default 3000 }}
+              protocol: TCP
+
+          # Variables de entorno desde ConfigMap (no sensibles)
+          envFrom:
+            - configMapRef:
+                name: {{ include "devops-app.configName" . }}
+
+          # Variables de entorno desde Secret (sensibles)
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "devops-app.secretName" . }}
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "devops-app.secretName" . }}
+                  key: DB_PASSWORD
+            - name: PORT
+              value: {{ .Values.config.backendPort | quote }}
+
+          # Recursos — requests = garantizado, limits = máximo
+          resources:
+            requests:
+              cpu:    {{ .Values.backend.resources.requests.cpu }}
+              memory: {{ .Values.backend.resources.requests.memory }}
+            limits:
+              cpu:    {{ .Values.backend.resources.limits.cpu }}
+              memory: {{ .Values.backend.resources.limits.memory }}
+
+          # Liveness — si falla, Kubernetes reinicia el Pod
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.backend.livenessProbe.path }}
+              port: 3000
+            initialDelaySeconds: {{ .Values.backend.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.backend.livenessProbe.periodSeconds }}
+
+          # Readiness — si falla, el Pod no recibe tráfico
+          # pero no se reinicia
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.backend.readinessProbe.path }}
+              port: 3000
+            initialDelaySeconds: {{ .Values.backend.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.backend.readinessProbe.periodSeconds }}

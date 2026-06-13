@@ -1,0 +1,67 @@
+# ============================================================
+# Ingress — Punto de entrada público
+# Enruta el tráfico externo hacia los Services internos
+# Requiere un Ingress Controller instalado en el clúster
+# En minikube: minikube addons enable ingress
+# En prod: nginx-ingress-controller o AWS ALB Controller
+# ============================================================
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "devops-app.fullname" . }}-ingress
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "devops-app.labels" . | nindent 4 }}
+  annotations:
+    # Clase del Ingress Controller que gestionará este Ingress
+    kubernetes.io/ingress.class: {{ .Values.ingress.className | quote }}
+
+    # Redirige HTTP → HTTPS automáticamente (solo en prod con TLS)
+    {{- if .Values.ingress.tls }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    {{- else }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    {{- end }}
+
+    # Tamaño máximo del body de las peticiones
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+
+    # Timeouts
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+
+  {{- if .Values.ingress.tls }}
+  # TLS — solo activo en prod (values-prod.yaml: tls: true)
+  # cert-manager genera y renueva el certificado automáticamente
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ include "devops-app.fullname" . }}-tls
+  {{- end }}
+
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          # /api/* → backend (Node.js)
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "devops-app.fullname" . }}-backend
+                port:
+                  number: {{ .Values.backend.service.port }}
+
+          # /* → frontend (Nginx)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "devops-app.fullname" . }}-frontend
+                port:
+                  number: {{ .Values.frontend.service.port }}
+{{- end }}

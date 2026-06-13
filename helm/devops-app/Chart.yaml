@@ -1,0 +1,25 @@
+# ============================================================
+# Chart.yaml — Metadatos del Helm Chart
+# ============================================================
+apiVersion: v2          # versión de la API de Helm (v2 = Helm 3)
+name: devops-app        # nombre del chart
+description: "App de gestión de contactos — Frontend + Backend + PostgreSQL"
+type: application       # application = app desplegable / library = solo helpers
+
+# Versión del chart (infraestructura)
+# Sube cuando cambias algo en los templates de Helm
+version: 1.0.0
+
+# Versión de la aplicación que despliega este chart
+# Sube cuando cambias el código de la app
+appVersion: "1.0.0"
+
+keywords:
+  - nodejs
+  - postgresql
+  - nginx
+  - devops
+
+maintainers:
+  - name: Roberto
+    email: robjimezdev@gmail.com

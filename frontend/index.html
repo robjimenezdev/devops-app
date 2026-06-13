@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DevOps App — Contactos</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+      margin-bottom: 0.3rem;
+      color: #38bdf8;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-bottom: 2rem;
+    }
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .card h2 {
+      font-size: 1rem;
+      color: #94a3b8;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    input, textarea {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 0.7rem 1rem;
+      color: #e2e8f0;
+      font-size: 0.95rem;
+      margin-bottom: 0.8rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, textarea:focus { border-color: #38bdf8; }
+    textarea { resize: vertical; min-height: 90px; }
+    button {
+      width: 100%;
+      padding: 0.75rem;
+      background: #0ea5e9;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #0284c7; }
+    button:disabled { background: #334155; cursor: not-allowed; }
+    #msg {
+      text-align: center;
+      margin-top: 0.7rem;
+      font-size: 0.9rem;
+      min-height: 1.2rem;
+    }
+    .ok  { color: #4ade80; }
+    .err { color: #f87171; }
+    .contact-item {
+      border-bottom: 1px solid #1e293b;
+      padding: 0.8rem 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    .contact-item:last-child { border-bottom: none; }
+    .contact-info .name  { font-weight: 600; color: #e2e8f0; }
+    .contact-info .email { font-size: 0.82rem; color: #38bdf8; margin: 0.1rem 0; }
+    .contact-info .msg   { font-size: 0.85rem; color: #94a3b8; }
+    .contact-info .date  { font-size: 0.75rem; color: #475569; margin-top: 0.2rem; }
+    .btn-delete {
+      background: none;
+      border: 1px solid #ef4444;
+      color: #ef4444;
+      width: auto;
+      padding: 0.3rem 0.7rem;
+      font-size: 0.8rem;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+    .btn-delete:hover { background: #ef4444; color: white; }
+    #empty { color: #475569; text-align: center; padding: 1rem 0; font-size: 0.9rem; }
+    .badge {
+      display: inline-block;
+      background: #0ea5e9;
+      color: white;
+      border-radius: 99px;
+      font-size: 0.75rem;
+      padding: 0.1rem 0.5rem;
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📋 Gestión de Contactos</h1>
+    <p class="subtitle">DevOps Demo App · Node.js + PostgreSQL</p>
+
+    <div class="card">
+      <h2>Nuevo Contacto</h2>
+      <input id="name"    type="text"  placeholder="Nombre" maxlength="100"/>
+      <input id="email"   type="email" placeholder="Email"  maxlength="150"/>
+      <textarea id="message" placeholder="Mensaje" maxlength="1000"></textarea>
+      <button id="btn-send" onclick="sendContact()">Guardar contacto</button>
+      <div id="msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>Contactos guardados <span class="badge" id="count">0</span></h2>
+      <div id="list"><div id="empty">Cargando...</div></div>
+    </div>
+  </div>
+
+  <script>
+    const API = (window.API_URL || 'http://localhost:3000');
+
+    async function loadContacts() {
+      try {
+        const res = await fetch(`${API}/contacts`);
+        const data = await res.json();
+        document.getElementById('count').textContent = data.length;
+        const list = document.getElementById('list');
+        if (!data.length) {
+          list.innerHTML = '<div id="empty">Sin contactos todavía</div>';
+          return;
+        }
+        list.innerHTML = data.map(c => `
+          <div class="contact-item">
+            <div class="contact-info">
+              <div class="name">${esc(c.name)}</div>
+              <div class="email">${esc(c.email)}</div>
+              <div class="msg">${esc(c.message)}</div>
+              <div class="date">${new Date(c.created_at).toLocaleString('es-ES')}</div>
+            </div>
+            <button class="btn-delete" onclick="deleteContact(${c.id})">✕</button>
+          </div>
+        `).join('');
+      } catch {
+        document.getElementById('list').innerHTML = '<div id="empty" style="color:#f87171">Error al conectar con el backend</div>';
+      }
+    }
+
+    async function sendContact() {
+      const name    = document.getElementById('name').value.trim();
+      const email   = document.getElementById('email').value.trim();
+      const message = document.getElementById('message').value.trim();
+      const msg     = document.getElementById('msg');
+      const btn     = document.getElementById('btn-send');
+
+      if (!name || !email || !message) {
+        msg.textContent = '⚠ Rellena todos los campos';
+        msg.className = 'err';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Guardando...';
+      msg.textContent = '';
+
+      try {
+        const res = await fetch(`${API}/contacts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, message })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        msg.textContent = '✓ Contacto guardado';
+        msg.className = 'ok';
+        document.getElementById('name').value = '';
+        document.getElementById('email').value = '';
+        document.getElementById('message').value = '';
+        loadContacts();
+      } catch (err) {
+        msg.textContent = '✕ ' + err.message;
+        msg.className = 'err';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Guardar contacto';
+      }
+    }
+
+    async function deleteContact(id) {
+      if (!confirm('¿Eliminar este contacto?')) return;
+      await fetch(`${API}/contacts/${id}`, { method: 'DELETE' });
+      loadContacts();
+    }
+
+    function esc(str) {
+      return String(str)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    loadContacts();
+    setInterval(loadContacts, 10000);
+  </script>
+</body>
+</html>

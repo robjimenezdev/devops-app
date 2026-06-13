@@ -1,0 +1,27 @@
+# ============================================================
+# ConfigMap — Variables de configuración NO sensibles
+# Se montan como variables de entorno en los Pods
+# ============================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "devops-app.configName" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "devops-app.labels" . | nindent 4 }}
+data:
+  # Nombre de la base de datos
+  DB_NAME: {{ .Values.config.dbName | quote }}
+
+  # Puerto de PostgreSQL
+  DB_PORT: {{ .Values.config.dbPort | quote }}
+
+  # Host de la DB — nombre del Service interno de Kubernetes
+  # Los Pods se comunican por nombre de Service, no por IP
+  DB_HOST: {{ include "devops-app.fullname" . }}-db
+
+  # Puerto del backend — lo usa el frontend para llamar a la API
+  BACKEND_PORT: {{ .Values.config.backendPort | quote }}
+
+  # Entorno actual
+  NODE_ENV: {{ .Values.global.environment | quote }}

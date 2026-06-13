@@ -1,0 +1,30 @@
+# ============================================================
+# values-dev.yaml — Sobreescribe values.yaml para DEV
+# Se despliega automático en cada push a develop
+# ============================================================
+
+global:
+  environment: dev
+
+backend:
+  replicaCount: 1
+  image:
+    tag: dev       # imagen taggeada como "dev" en Docker Hub
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+frontend:
+  replicaCount: 1
+  image:
+    tag: dev
+
+ingress:
+  host: dev.devops-app.local
+  tls: false
+
+namespace: dev
